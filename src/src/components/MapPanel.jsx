@@ -67,6 +67,9 @@ export default function MapPanel({ mapLayer, onLayerChange, zone, onZoneChange }
       center: DEFAULT_CENTER,
       zoom: DEFAULT_ZOOM,
       attributionControl: false,
+      minZoom: 2,
+      maxBounds: [[-90, -180], [90, 180]],
+      maxBoundsViscosity: 1.0,
     });
     mapRef.current = map;
 
@@ -210,9 +213,14 @@ export default function MapPanel({ mapLayer, onLayerChange, zone, onZoneChange }
 
     setSearchStatus('Recherche…');
     try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
-      const response = await fetch(url, { headers: { 'Accept-Language': 'fr' } });
-      const results = await response.json();
+      const frUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=fr&q=${encodeURIComponent(query)}`;
+      const frResponse = await fetch(frUrl, { headers: { 'Accept-Language': 'fr' } });
+      let results = await frResponse.json();
+      if (!results || results.length === 0) {
+        const globalUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+        const globalResponse = await fetch(globalUrl, { headers: { 'Accept-Language': 'fr' } });
+        results = await globalResponse.json();
+      }
       if (results && results[0]) {
         const { boundingbox } = results[0];
         const bounds = L.latLngBounds(
@@ -239,10 +247,16 @@ export default function MapPanel({ mapLayer, onLayerChange, zone, onZoneChange }
 
     const timer = setTimeout(async () => {
       try {
-        const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&q=${encodeURIComponent(query)}`;
-        const response = await fetch(url, { headers: { 'Accept-Language': 'fr' } });
-        const results = await response.json();
-        const list = Array.isArray(results) ? results : [];
+        const frUrl = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=fr&q=${encodeURIComponent(query)}`;
+        const frResponse = await fetch(frUrl, { headers: { 'Accept-Language': 'fr' } });
+        const frResults = await frResponse.json();
+        let list = Array.isArray(frResults) ? frResults : [];
+        if (list.length === 0) {
+          const globalUrl = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&q=${encodeURIComponent(query)}`;
+          const globalResponse = await fetch(globalUrl, { headers: { 'Accept-Language': 'fr' } });
+          const globalResults = await globalResponse.json();
+          list = Array.isArray(globalResults) ? globalResults : [];
+        }
         const seen = new Set();
         const deduped = list.filter((result) => {
           const label = formatSuggestion(result);

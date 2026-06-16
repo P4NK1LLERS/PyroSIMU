@@ -28,7 +28,6 @@ function createInitialParams() {
     windGust: 25,
     temperature: 25,
     humidity: 40,
-    vegetation: 'conifere',
     fuelMoisture: 12,
   };
 }
@@ -36,6 +35,7 @@ function createInitialParams() {
 export default function App() {
   const [params, setParams] = useState(createInitialParams);
   const [zone, setZone] = useState(null);
+  const [nearestCity, setNearestCity] = useState(null);
   const [mapLayer, setMapLayer] = useState('plan');
   const [theme, setTheme] = useState(getInitialTheme);
   const [showDevModal, setShowDevModal] = useState(false);
@@ -46,6 +46,23 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (!zone) { setNearestCity(null); return; }
+    const lat = (zone.bounds.north + zone.bounds.south) / 2;
+    const lng = (zone.bounds.east + zone.bounds.west) / 2;
+    fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat.toFixed(5)}&lon=${lng.toFixed(5)}&zoom=10&addressdetails=1`,
+      { headers: { 'Accept-Language': 'fr' } },
+    )
+      .then((r) => r.json())
+      .then((data) => {
+        const a = data.address || {};
+        const city = a.city || a.town || a.village || a.municipality || a.county || null;
+        setNearestCity(city);
+      })
+      .catch(() => setNearestCity(null));
+  }, [zone]);
 
   const updateParam = useCallback((key, value) => {
     setParams((prev) => ({ ...prev, [key]: value }));
@@ -75,7 +92,7 @@ export default function App() {
     setNameError(false);
     window.engine?.send({
       type: 'simulation:create',
-      payload: { ...params, zone },
+      payload: { ...params, zone, nearestCity },
     });
     setShowDevModal(true);
   };
